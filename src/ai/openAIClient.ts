@@ -8,7 +8,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function generateInfraFromPrompt(prompt: string) {
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-3.5-turbo',
     messages: [
       { role: 'system', content: 'You are an infra-as-code expert. Output only valid Terraform + GitHub Actions YAML.' },
       { role: 'user', content: prompt },
@@ -28,7 +28,17 @@ function parseAIResponse(raw: string) {
 }
 
 function extractCode(raw: string, lang: string) {
-  const regex = new RegExp(`\`\`\`${lang}([\\s\\S]*?)\`\`\``, 'm');
-  const match = raw.match(regex);
-  return match ? match[1].trim() : '';
+  // Extract YAML code blocks or plain YAML from the response
+  // Prefer code blocks, but fallback to the whole response if not found
+  const codeBlockRegex = /```(?:yaml)?([\s\S]*?)```/i;
+  const match = raw.match(codeBlockRegex);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  // If no code block, try to find the first YAML document start
+  const yamlStart = raw.indexOf('name:');
+  if (yamlStart !== -1) {
+    return raw.slice(yamlStart).trim();
+  }
+  return raw.trim();
 }
